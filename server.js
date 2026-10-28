@@ -66,6 +66,7 @@ function verifyTelegram(initData) {
   }
 }
 
+
 async function initDatabase() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS players (
@@ -83,7 +84,17 @@ async function initDatabase() {
       reward INTEGER NOT NULL DEFAULT 0
     );
   `);
+
+  await db.query(`
+    ALTER TABLE players
+      ADD COLUMN IF NOT EXISTS power INTEGER NOT NULL DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS upgrade_cost BIGINT NOT NULL DEFAULT 25,
+      ADD COLUMN IF NOT EXISTS workers INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS worker_cost BIGINT NOT NULL DEFAULT 50,
+      ADD COLUMN IF NOT EXISTS selected_mine INTEGER NOT NULL DEFAULT 0;
+  `);
 }
+
 
 async function telegramPlayer(req, res, next) {
   const user = verifyTelegram(req.body?.initData);
