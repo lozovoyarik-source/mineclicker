@@ -47,146 +47,236 @@ button:disabled{opacity:.45}
 </div>
 
 <script>
-const canvas=document.getElementById('mine');
-const ctx=canvas.getContext('2d');
-const $=id=>document.getElementById(id);
 
-const mines=[
- {name:'💎 Кристальна печера',resource:'Кристали',color:'#48dff5',dark:'#176bba',unlock:0,mult:1},
- {name:'🟡 Золота шахта',resource:'Золото',color:'#ffd65a',dark:'#a96919',unlock:500,mult:2},
- {name:'🟣 Аметистова безодня',resource:'Аметисти',color:'#c18aff',dark:'#6b36b5',unlock:2500,mult:5},
- {name:'🔴 Магматична шахта',resource:'Магма-кристали',color:'#ff775f',dark:'#a92e38',unlock:10000,mult:12}
+const canvas = document.getElementById("mine");
+const ctx = canvas.getContext("2d");
+const $ = id => document.getElementById(id);
+const tg = window.Telegram?.WebApp;
+
+const mines = [
+  { name: "💎 Кристальна печера", resource: "Кристали", color: "#48dff5", dark: "#176bba", unlock: 0, mult: 1 },
+  { name: "🟡 Золота шахта", resource: "Золото", color: "#ffd65a", dark: "#a96919", unlock: 500, mult: 2 },
+  { name: "🟣 Аметистова безодня", resource: "Аметисти", color: "#c18aff", dark: "#6b36b5", unlock: 2500, mult: 5 },
+  { name: "🔴 Магматична шахта", resource: "Магма-кристали", color: "#ff775f", dark: "#a92e38", unlock: 10000, mult: 12 }
 ];
 
-let coins=0,power=1,upgradeCost=25,workers=0,workerCost=50;
-let selected=0,particles=[],lastSave=Date.now();
+let coins = 0;
+let power = 1;
+let upgradeCost = 25;
+let workers = 0;
+let workerCost = 50;
+let selected = 0;
+let particles = [];
+let busy = false;
+let guestToken = localStorage.getItem("mineclicker-guest-token");
+let initData = tg?.initData || "";
+let ready = false;
 
-function update(){
- $('coins').textContent=Math.floor(coins).toLocaleString('uk-UA');
- $('power').textContent=power*mines[selected].mult;
- $('rate').textContent=workers*mines[selected].mult;
- $('mineName').textContent=mines[selected].name;
- $('mineInfo').textContent=`Ресурс: ${mines[selected].resource} · Множник ×${mines[selected].mult}`;
- $('upgradeBtn').textContent=`⚙️ Кирка — ${upgradeCost} 🪙`;
- $('workerBtn').textContent=`🤖 Шахтар — ${workerCost} 🪙`;
- $('mineButtons').innerHTML='';
- mines.forEach((m,i)=>{
-   const b=document.createElement('button');
-   b.textContent=coins>=m.unlock?m.name:`🔒 ${m.name} (${m.unlock} 🪙)`;
-   b.className=i===selected?'active':'';
-   b.disabled=coins<m.unlock;
-   b.onclick=()=>{selected=i;update();drawMine()};
-   $('mineButtons').appendChild(b);
- });
+if (tg) {
+  tg.ready();
+  tg.expand();
 }
 
-function drawMine(){
- const m=mines[selected];
- ctx.clearRect(0,0,500,360);
- const bg=ctx.createLinearGradient(0,0,0,360);
- bg.addColorStop(0,'#26344e');bg.addColorStop(1,'#111827');
- ctx.fillStyle=bg;ctx.fillRect(0,0,500,360);
+function drawMine() {
+  const m = mines[selected];
+  ctx.clearRect(0, 0, 500, 360);
 
- ctx.fillStyle='#46516a';
- ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(155,85);
- ctx.lineTo(155,290);ctx.lineTo(0,360);ctx.fill();
+  const bg = ctx.createLinearGradient(0, 0, 0, 360);
+  bg.addColorStop(0, "#26344e");
+  bg.addColorStop(1, "#111827");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 500, 360);
 
- ctx.fillStyle='#303b52';
- ctx.beginPath();ctx.moveTo(500,0);ctx.lineTo(345,85);
- ctx.lineTo(345,290);ctx.lineTo(500,360);ctx.fill();
+  ctx.fillStyle = "#46516a";
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(155, 85);
+  ctx.lineTo(155, 290);
+  ctx.lineTo(0, 360);
+  ctx.fill();
 
- ctx.save();
- ctx.shadowColor=m.color;ctx.shadowBlur=35;
- ctx.fillStyle=m.color;
- ctx.beginPath();ctx.moveTo(250,70);ctx.lineTo(320,155);
- ctx.lineTo(285,245);ctx.lineTo(215,245);ctx.lineTo(180,155);
- ctx.closePath();ctx.fill();ctx.restore();
+  ctx.fillStyle = "#303b52";
+  ctx.beginPath();
+  ctx.moveTo(500, 0);
+  ctx.lineTo(345, 85);
+  ctx.lineTo(345, 290);
+  ctx.lineTo(500, 360);
+  ctx.fill();
 
- ctx.fillStyle='#ffffff88';
- ctx.beginPath();ctx.moveTo(250,90);ctx.lineTo(250,220);
- ctx.lineTo(205,155);ctx.closePath();ctx.fill();
+  ctx.save();
+  ctx.shadowColor = m.color;
+  ctx.shadowBlur = 35;
+  ctx.fillStyle = m.color;
+  ctx.beginPath();
+  ctx.moveTo(250, 70);
+  ctx.lineTo(320, 155);
+  ctx.lineTo(285, 245);
+  ctx.lineTo(215, 245);
+  ctx.lineTo(180, 155);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 
- ctx.fillStyle=m.dark;
- ctx.beginPath();ctx.moveTo(250,220);ctx.lineTo(295,155);
- ctx.lineTo(285,225);ctx.lineTo(250,240);ctx.closePath();ctx.fill();
+  ctx.fillStyle = "#ffffff88";
+  ctx.beginPath();
+  ctx.moveTo(250, 90);
+  ctx.lineTo(250, 220);
+  ctx.lineTo(205, 155);
+  ctx.closePath();
+  ctx.fill();
 
- for(const p of particles){
-   ctx.globalAlpha=Math.max(0,p.life);
-   ctx.fillStyle=p.color;
-   ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
- }
- ctx.globalAlpha=1;
+  ctx.fillStyle = m.dark;
+  ctx.beginPath();
+  ctx.moveTo(250, 220);
+  ctx.lineTo(295, 155);
+  ctx.lineTo(285, 225);
+  ctx.lineTo(250, 240);
+  ctx.closePath();
+  ctx.fill();
+
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 
-function mine(){
- const amount=power*mines[selected].mult;
- coins+=amount;
- for(let i=0;i<14;i++){
-   particles.push({
-     x:250,y:165,vx:(Math.random()-.5)*8,
-     vy:(Math.random()-.5)*8,life:1,
-     size:2+Math.random()*4,color:mines[selected].color
-   });
- }
- update();
+function update() {
+  $("coins").textContent = Math.floor(coins).toLocaleString("uk-UA");
+  $("power").textContent = power * mines[selected].mult;
+  $("rate").textContent = workers * mines[selected].mult;
+  $("mineName").textContent = mines[selected].name;
+  $("mineInfo").textContent =
+    `Ресурс: ${mines[selected].resource} · Множник ×${mines[selected].mult}`;
+  $("upgradeBtn").textContent = `⚙️ Кирка — ${upgradeCost} 🪙`;
+  $("workerBtn").textContent = `🤖 Шахтар — ${workerCost} 🪙`;
+
+  $("mineButtons").innerHTML = "";
+  mines.forEach((m, i) => {
+    const b = document.createElement("button");
+    b.textContent = coins >= m.unlock ? m.name : `🔒 ${m.name} (${m.unlock} 🪙)`;
+    b.className = i === selected ? "active" : "";
+    b.disabled = !ready || busy || coins < m.unlock;
+    b.onclick = () => perform("select", i);
+    $("mineButtons").appendChild(b);
+  });
+
+  $("mineBtn").disabled = !ready || busy;
+  $("upgradeBtn").disabled = !ready || busy;
+  $("workerBtn").disabled = !ready || busy;
 }
 
-function animate(){
- for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=.025}
- particles=particles.filter(p=>p.life>0);
- drawMine();
- requestAnimationFrame(animate);
+async function api(path, extra = {}) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...(initData ? { initData } : { guestToken }),
+      ...extra
+    })
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Помилка сервера");
+  return data;
 }
 
-$('mineBtn').onclick=mine;
-canvas.addEventListener('click',mine);
+function applyPlayer(p) {
+  coins = Number(p.coins);
+  power = p.power;
+  upgradeCost = Number(p.upgradeCost);
+  workers = p.workers;
+  workerCost = Number(p.workerCost);
+  selected = p.selected;
+  update();
+}
 
-$('upgradeBtn').onclick=()=>{
- if(coins<upgradeCost){$('hint').textContent='Недостатньо монет!';return}
- coins-=upgradeCost;power++;
- upgradeCost=Math.floor(upgradeCost*1.7);
- $('hint').textContent=`Кирку покращено! Сила: ${power}`;
- update();
-};
+async function connect() {
+  try {
+    $("hint").textContent = "Завантаження збереження…";
 
-$('workerBtn').onclick=()=>{
- if(coins<workerCost){$('hint').textContent='Недостатньо монет!';return}
- coins-=workerCost;workers++;
- workerCost=Math.floor(workerCost*1.8);
- $('hint').textContent=`Шахтар найнятий! Пасивний видобуток: ${workers} за секунду`;
- update();
-};
+    if (!initData && !guestToken) {
+      const response = await fetch("/api/guest-session", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Не вдалося створити профіль");
+      guestToken = data.guestToken;
+      localStorage.setItem("mineclicker-guest-token", guestToken);
+    }
 
-setInterval(()=>{
- coins+=workers*mines[selected].mult;
- update();
-},1000);
+    const data = await api("/api/player");
+    applyPlayer(data.player);
+    ready = true;
+    $("hint").textContent = "Прогрес завантажено із сервера!";
+    update();
+  } catch (error) {
+    $("hint").textContent = `Не вдалося завантажити гру: ${error.message}`;
+  }
+}
 
-setInterval(()=>{
- if(Date.now()-lastSave>5000){
-   try{
-     localStorage.setItem('mineclicker-save',JSON.stringify({
-       coins,power,upgradeCost,workers,workerCost,selected
-     }));
-   }catch(e){}
-   lastSave=Date.now();
- }
-},1000);
+async function perform(action, mineIndex) {
+  if (!ready || busy) return;
 
-try{
- const save=JSON.parse(localStorage.getItem('mineclicker-save'));
- if(save){
-   coins=Math.max(0,Number(save.coins)||0);
-   power=Math.max(1,Number(save.power)||1);
-   upgradeCost=Math.max(25,Number(save.upgradeCost)||25);
-   workers=Math.max(0,Number(save.workers)||0);
-   workerCost=Math.max(50,Number(save.workerCost)||50);
-   selected=Math.min(3,Math.max(0,Number(save.selected)||0));
- }
-}catch(e){}
+  busy = true;
+  update();
+
+  try {
+    const data = await api("/api/action", {
+      action,
+      ...(action === "select" ? { selected: mineIndex } : {})
+    });
+
+    applyPlayer(data.player);
+
+    if (action === "mine") {
+      const m = mines[selected];
+      for (let i = 0; i < 14; i++) {
+        particles.push({
+          x: 250,
+          y: 165,
+          vx: (Math.random() - 0.5) * 8,
+          vy: (Math.random() - 0.5) * 8,
+          life: 1,
+          size: 2 + Math.random() * 4,
+          color: m.color
+        });
+      }
+    }
+
+    if (action === "upgrade") $("hint").textContent = "Кирку покращено!";
+    else if (action === "hire") $("hint").textContent = "Шахтар найнятий!";
+    else if (action === "mine") $("hint").textContent = "Ресурси видобуто!";
+    else $("hint").textContent = "Шахту змінено!";
+  } catch (error) {
+    $("hint").textContent = error.message;
+  } finally {
+    busy = false;
+    update();
+  }
+}
+
+function animate() {
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.025;
+  }
+  particles = particles.filter(p => p.life > 0);
+  drawMine();
+  requestAnimationFrame(animate);
+}
+
+$("mineBtn").onclick = () => perform("mine");
+canvas.addEventListener("click", () => perform("mine"));
+$("upgradeBtn").onclick = () => perform("upgrade");
+$("workerBtn").onclick = () => perform("hire");
 
 update();
 animate();
+connect();
+
 </script>
 </body>
 </html>
