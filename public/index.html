@@ -2,187 +2,190 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101522">
-  <title>MineClicker — Шахтарська імперія</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: #101522;
-      color: #f4f7ff;
-      font-family: Arial, sans-serif;
-      text-align: center;
-    }
-    header { padding: 20px 12px 8px; }
-    h1 { margin: 0; color: #75e6ff; }
-    #stats { margin: 18px; font-size: 20px; }
-    canvas {
-      display: block;
-      width: min(94vw, 500px);
-      height: auto;
-      margin: 0 auto;
-      border: 1px solid #33435e;
-      border-radius: 18px;
-      touch-action: manipulation;
-    }
-    button {
-      margin: 8px 4px;
-      padding: 12px 18px;
-      border: 0;
-      border-radius: 12px;
-      background: #2879df;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    button:active { transform: scale(.96); }
-    #hint { color: #aab8d0; font-size: 14px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101522">
+<title>MineClicker — Шахтарська імперія</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101522;color:#f4f7ff;font-family:Arial,sans-serif;text-align:center}
+header{padding:20px 10px 8px}
+h1{margin:0;color:#75e6ff}
+#stats{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin:16px}
+canvas{display:block;width:min(94vw,500px);height:auto;margin:auto;border:1px solid #33435e;border-radius:18px;touch-action:manipulation}
+button{margin:5px;padding:11px 14px;border:1px solid #405777;border-radius:12px;background:#23334d;color:white;font-size:15px;cursor:pointer}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.45}
+.active{background:#167dba;border-color:#75e6ff}
+.panel{max-width:520px;margin:14px auto;padding:12px}
+#hint{color:#aab8d0;font-size:14px;min-height:20px}
+</style>
 </head>
 <body>
-  <header>
-    <h1>⛏️ MineClicker</h1>
-    <p>Побудуй власну шахтарську імперію!</p>
-  </header>
+<header>
+<h1>⛏️ MineClicker</h1>
+<p>Побудуй власну шахтарську імперію!</p>
+</header>
 
-  <div id="stats">
-    🪙 Монети: <strong id="coins">0</strong>
-  </div>
+<div id="stats">
+<span>🪙 Монети: <b id="coins">0</b></span>
+<span>⚡ За клік: <b id="power">1</b></span>
+<span>🤖 За секунду: <b id="rate">0</b></span>
+</div>
 
-  <canvas id="mine" width="500" height="360"
-          aria-label="Натискай на руду, щоб добувати монети"></canvas>
+<canvas id="mine" width="500" height="360"></canvas>
 
-  <div>
-    <button id="mineBtn">⛏️ Видобувати</button>
-    <button id="upgradeBtn">⚙️ Кирка — 25 🪙</button>
-  </div>
-  <p id="hint">Кожне натискання приносить монети.</p>
+<div class="panel">
+<h3 id="mineName">💎 Кристальна печера</h3>
+<div id="mineButtons"></div>
+<p id="mineInfo">Видобувай ресурси та покращуй спорядження.</p>
+<button id="mineBtn">⛏️ Видобувати</button>
+<button id="upgradeBtn">⚙️ Покращити кирку — 25 🪙</button>
+<button id="workerBtn">🤖 Найняти шахтаря — 50 🪙</button>
+<p id="hint">Натискай на кристал або кнопку видобутку!</p>
+</div>
 
-  <script>
-    const canvas = document.getElementById('mine');
-    const ctx = canvas.getContext('2d');
-    const coinsEl = document.getElementById('coins');
-    const hint = document.getElementById('hint');
+<script>
+const canvas=document.getElementById('mine');
+const ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
 
-    let coins = 0;
-    let power = 1;
-    let upgradeCost = 25;
-    let particles = [];
+const mines=[
+ {name:'💎 Кристальна печера',resource:'Кристали',color:'#48dff5',dark:'#176bba',unlock:0,mult:1},
+ {name:'🟡 Золота шахта',resource:'Золото',color:'#ffd65a',dark:'#a96919',unlock:500,mult:2},
+ {name:'🟣 Аметистова безодня',resource:'Аметисти',color:'#c18aff',dark:'#6b36b5',unlock:2500,mult:5},
+ {name:'🔴 Магматична шахта',resource:'Магма-кристали',color:'#ff775f',dark:'#a92e38',unlock:10000,mult:12}
+];
 
-    function drawMine() {
-      ctx.clearRect(0, 0, 500, 360);
+let coins=0,power=1,upgradeCost=25,workers=0,workerCost=50;
+let selected=0,particles=[],lastSave=Date.now();
 
-      const bg = ctx.createLinearGradient(0, 0, 0, 360);
-      bg.addColorStop(0, '#26344e');
-      bg.addColorStop(1, '#111827');
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, 500, 360);
+function update(){
+ $('coins').textContent=Math.floor(coins).toLocaleString('uk-UA');
+ $('power').textContent=power*mines[selected].mult;
+ $('rate').textContent=workers*mines[selected].mult;
+ $('mineName').textContent=mines[selected].name;
+ $('mineInfo').textContent=`Ресурс: ${mines[selected].resource} · Множник ×${mines[selected].mult}`;
+ $('upgradeBtn').textContent=`⚙️ Кирка — ${upgradeCost} 🪙`;
+ $('workerBtn').textContent=`🤖 Шахтар — ${workerCost} 🪙`;
+ $('mineButtons').innerHTML='';
+ mines.forEach((m,i)=>{
+   const b=document.createElement('button');
+   b.textContent=coins>=m.unlock?m.name:`🔒 ${m.name} (${m.unlock} 🪙)`;
+   b.className=i===selected?'active':'';
+   b.disabled=coins<m.unlock;
+   b.onclick=()=>{selected=i;update();drawMine()};
+   $('mineButtons').appendChild(b);
+ });
+}
 
-      // Псевдо-3D стіни шахти
-      ctx.fillStyle = '#46516a';
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(155, 85);
-      ctx.lineTo(155, 290);
-      ctx.lineTo(0, 360);
-      ctx.fill();
+function drawMine(){
+ const m=mines[selected];
+ ctx.clearRect(0,0,500,360);
+ const bg=ctx.createLinearGradient(0,0,0,360);
+ bg.addColorStop(0,'#26344e');bg.addColorStop(1,'#111827');
+ ctx.fillStyle=bg;ctx.fillRect(0,0,500,360);
 
-      ctx.fillStyle = '#303b52';
-      ctx.beginPath();
-      ctx.moveTo(500, 0);
-      ctx.lineTo(345, 85);
-      ctx.lineTo(345, 290);
-      ctx.lineTo(500, 360);
-      ctx.fill();
+ ctx.fillStyle='#46516a';
+ ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(155,85);
+ ctx.lineTo(155,290);ctx.lineTo(0,360);ctx.fill();
 
-      // Кристал із сяйвом
-      ctx.save();
-      ctx.shadowColor = '#36e6ff';
-      ctx.shadowBlur = 30;
-      ctx.fillStyle = '#48dff5';
-      ctx.beginPath();
-      ctx.moveTo(250, 75);
-      ctx.lineTo(320, 155);
-      ctx.lineTo(285, 245);
-      ctx.lineTo(215, 245);
-      ctx.lineTo(180, 155);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+ ctx.fillStyle='#303b52';
+ ctx.beginPath();ctx.moveTo(500,0);ctx.lineTo(345,85);
+ ctx.lineTo(345,290);ctx.lineTo(500,360);ctx.fill();
 
-      ctx.fillStyle = '#b7f7ff';
-      ctx.beginPath();
-      ctx.moveTo(250, 92);
-      ctx.lineTo(250, 220);
-      ctx.lineTo(205, 155);
-      ctx.closePath();
-      ctx.fill();
+ ctx.save();
+ ctx.shadowColor=m.color;ctx.shadowBlur=35;
+ ctx.fillStyle=m.color;
+ ctx.beginPath();ctx.moveTo(250,70);ctx.lineTo(320,155);
+ ctx.lineTo(285,245);ctx.lineTo(215,245);ctx.lineTo(180,155);
+ ctx.closePath();ctx.fill();ctx.restore();
 
-      ctx.fillStyle = '#2398cb';
-      ctx.beginPath();
-      ctx.moveTo(250, 220);
-      ctx.lineTo(295, 155);
-      ctx.lineTo(285, 225);
-      ctx.lineTo(250, 240);
-      ctx.closePath();
-      ctx.fill();
+ ctx.fillStyle='#ffffff88';
+ ctx.beginPath();ctx.moveTo(250,90);ctx.lineTo(250,220);
+ ctx.lineTo(205,155);ctx.closePath();ctx.fill();
 
-      // Частинки
-      for (const p of particles) {
-        ctx.globalAlpha = Math.max(0, p.life);
-        ctx.fillStyle = '#ffe78a';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
+ ctx.fillStyle=m.dark;
+ ctx.beginPath();ctx.moveTo(250,220);ctx.lineTo(295,155);
+ ctx.lineTo(285,225);ctx.lineTo(250,240);ctx.closePath();ctx.fill();
 
-    function animate() {
-      for (const p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.025;
-      }
-      particles = particles.filter(p => p.life > 0);
-      drawMine();
-      requestAnimationFrame(animate);
-    }
+ for(const p of particles){
+   ctx.globalAlpha=Math.max(0,p.life);
+   ctx.fillStyle=p.color;
+   ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+ }
+ ctx.globalAlpha=1;
+}
 
-    function mine() {
-      coins += power;
-      coinsEl.textContent = coins;
+function mine(){
+ const amount=power*mines[selected].mult;
+ coins+=amount;
+ for(let i=0;i<14;i++){
+   particles.push({
+     x:250,y:165,vx:(Math.random()-.5)*8,
+     vy:(Math.random()-.5)*8,life:1,
+     size:2+Math.random()*4,color:mines[selected].color
+   });
+ }
+ update();
+}
 
-      for (let i = 0; i < 12; i++) {
-        particles.push({
-          x: 250, y: 165,
-          vx: (Math.random() - 0.5) * 7,
-          vy: (Math.random() - 0.5) * 7,
-          life: 1
-        });
-      }
-    }
+function animate(){
+ for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=.025}
+ particles=particles.filter(p=>p.life>0);
+ drawMine();
+ requestAnimationFrame(animate);
+}
 
-    document.getElementById('mineBtn').addEventListener('click', mine);
-    canvas.addEventListener('click', mine);
+$('mineBtn').onclick=mine;
+canvas.addEventListener('click',mine);
 
-    document.getElementById('upgradeBtn').addEventListener('click', () => {
-      if (coins < upgradeCost) {
-        hint.textContent = `Потрібно ще ${upgradeCost - coins} монет!`;
-        return;
-      }
-      coins -= upgradeCost;
-      power++;
-      upgradeCost = Math.floor(upgradeCost * 1.7);
-      coinsEl.textContent = coins;
-      document.getElementById('upgradeBtn').textContent =
-        `⚙️ Кирка — ${upgradeCost} 🪙`;
-      hint.textContent = `Сила видобутку: ${power} монет за натискання!`;
-    });
+$('upgradeBtn').onclick=()=>{
+ if(coins<upgradeCost){$('hint').textContent='Недостатньо монет!';return}
+ coins-=upgradeCost;power++;
+ upgradeCost=Math.floor(upgradeCost*1.7);
+ $('hint').textContent=`Кирку покращено! Сила: ${power}`;
+ update();
+};
 
-    animate();
-  </script>
+$('workerBtn').onclick=()=>{
+ if(coins<workerCost){$('hint').textContent='Недостатньо монет!';return}
+ coins-=workerCost;workers++;
+ workerCost=Math.floor(workerCost*1.8);
+ $('hint').textContent=`Шахтар найнятий! Пасивний видобуток: ${workers} за секунду`;
+ update();
+};
+
+setInterval(()=>{
+ coins+=workers*mines[selected].mult;
+ update();
+},1000);
+
+setInterval(()=>{
+ if(Date.now()-lastSave>5000){
+   try{
+     localStorage.setItem('mineclicker-save',JSON.stringify({
+       coins,power,upgradeCost,workers,workerCost,selected
+     }));
+   }catch(e){}
+   lastSave=Date.now();
+ }
+},1000);
+
+try{
+ const save=JSON.parse(localStorage.getItem('mineclicker-save'));
+ if(save){
+   coins=Math.max(0,Number(save.coins)||0);
+   power=Math.max(1,Number(save.power)||1);
+   upgradeCost=Math.max(25,Number(save.upgradeCost)||25);
+   workers=Math.max(0,Number(save.workers)||0);
+   workerCost=Math.max(50,Number(save.workerCost)||50);
+   selected=Math.min(3,Math.max(0,Number(save.selected)||0));
+ }
+}catch(e){}
+
+update();
+animate();
+</script>
 </body>
 </html>
