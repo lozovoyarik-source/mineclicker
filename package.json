@@ -9,6 +9,6 @@
   },
   "dependencies": {
     "express": "^5.1.0",
-    "better-sqlite3": "^12.2.0"
+    "pg": "^8.16.3"
   }
 }
